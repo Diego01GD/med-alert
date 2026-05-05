@@ -26,10 +26,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className={`${geistSans.className} antialiased bg-gradient-to-r from-blue-200 to-cyan-200`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
