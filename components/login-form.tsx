@@ -6,10 +6,57 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff } from  "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
+
+type LoginSecurityState = {
+  failedAttempts: number;
+  windowStartedAt: number;
+  lockedUntil: number | null;
+};
+
+function getSecurityKey(email: string) {
+  return `med-alert-login-security:${email.trim().toLowerCase()}`;
+}
+
+function readSecurityState(email: string): LoginSecurityState | null {
+  if (typeof window === "undefined" || !email.trim()) {
+    return null;
+  }
+
+  const rawState = window.localStorage.getItem(getSecurityKey(email));
+  if (!rawState) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawState) as LoginSecurityState;
+  } catch {
+    return null;
+  }
+}
+
+function writeSecurityState(email: string, state: LoginSecurityState) {
+  window.localStorage.setItem(getSecurityKey(email), JSON.stringify(state));
+}
+
+function clearSecurityState(email: string) {
+  window.localStorage.removeItem(getSecurityKey(email));
+}
+
+function formatRemainingTime(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
 
 export function LoginForm({
   className,
@@ -21,10 +68,91 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [blockTimeRemaining, setBlockTimeRemaining] = useState<number | null>(
+    null,
+  );
   const router = useRouter();
+
+  useEffect(() => {
+    if (!email.trim()) {
+      setBlockTimeRemaining(null);
+      return;
+    }
+
+    const syncBlockState = () => {
+      const securityState = readSecurityState(email);
+      if (!securityState?.lockedUntil) {
+        setBlockTimeRemaining(null);
+        return;
+      }
+
+      const remaining = securityState.lockedUntil - Date.now();
+      if (remaining <= 0) {
+        clearSecurityState(email);
+        setBlockTimeRemaining(null);
+        return;
+      }
+
+      setBlockTimeRemaining(remaining);
+    };
+
+    syncBlockState();
+    const intervalId = window.setInterval(syncBlockState, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [email]);
+
+  useEffect(() => {
+    const savedEmail = window.localStorage.getItem("med-alert-remember-email");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  const registerFailedAttempt = (normalizedEmail: string) => {
+    const now = Date.now();
+    const currentState = readSecurityState(normalizedEmail);
+
+    if (
+      !currentState ||
+      now - currentState.windowStartedAt > ATTEMPT_WINDOW_MS
+    ) {
+      writeSecurityState(normalizedEmail, {
+        failedAttempts: 1,
+        windowStartedAt: now,
+        lockedUntil: null,
+      });
+      return;
+    }
+
+    const nextState: LoginSecurityState = {
+      failedAttempts: currentState.failedAttempts + 1,
+      windowStartedAt: currentState.windowStartedAt,
+      lockedUntil: currentState.lockedUntil,
+    };
+
+    if (nextState.failedAttempts >= 3) {
+      nextState.lockedUntil = now + LOCK_DURATION_MS;
+      nextState.failedAttempts = 0;
+      nextState.windowStartedAt = now;
+      setBlockTimeRemaining(LOCK_DURATION_MS);
+    }
+
+    writeSecurityState(normalizedEmail, nextState);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (blockTimeRemaining !== null && blockTimeRemaining > 0) {
+      setError(
+        `Tu cuenta está bloqueada. Espera ${formatRemainingTime(blockTimeRemaining)} antes de intentar de nuevo.`,
+      );
+      return;
+    }
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -36,12 +164,18 @@ export function LoginForm({
       });
       if (error) throw error;
 
+      if (normalizedEmail) {
+        clearSecurityState(normalizedEmail);
+      }
       router.push("/protected");
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.message.includes("Invalid login credentials")) {
           setError("Correo o contraseña incorrectos");
-        }else {
+          if (normalizedEmail) {
+            registerFailedAttempt(normalizedEmail);
+          }
+        } else {
           setError(error.message);
         }
       } else {
@@ -56,11 +190,20 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <div className="rounded-[24px] bg-white px-6 py-7 shadow-[0_8px_20px_rgba(0,0,0,0.14)] md:px-8 md:py-8">
         <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Iniciar Sesión</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Iniciar Sesión
+          </h2>
           <p className="text-gray-600 text-sm">Por favor, ingresa tus datos</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
+          {blockTimeRemaining !== null && blockTimeRemaining > 0 && (
+            <div className="rounded-md border border-red-500/20 bg-red-50 px-4 py-3 text-sm text-red-700">
+              ⏱️ Tu cuenta está bloqueada por{" "}
+              {formatRemainingTime(blockTimeRemaining)} minutos.
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="email" className="text-gray-700 font-medium">
               Correo electrónico
@@ -85,6 +228,7 @@ export function LoginForm({
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
+                disabled={blockTimeRemaining !== null && blockTimeRemaining > 0}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-10 bg-gray-100 border-gray-300 text-gray-900 pr-12"
@@ -93,13 +237,11 @@ export function LoginForm({
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900 transition"
-                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-label={
+                  showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                }
               >
-                {showPassword ? (
-                  <EyeOff />
-                ) : (
-                  <Eye />
-                )}
+                {showPassword ? <EyeOff /> : <Eye />}
               </button>
             </div>
             <div className="pt-1 text-right">
@@ -119,19 +261,33 @@ export function LoginForm({
               onCheckedChange={(checked) => setRememberMe(checked as boolean)}
               className="border-gray-400"
             />
-            <Label htmlFor="remember" className="cursor-pointer text-sm font-normal text-gray-700">
+            <Label
+              htmlFor="remember"
+              className="cursor-pointer text-sm font-normal text-gray-700"
+            >
               Recordar sesión
             </Label>
           </div>
 
-          {error && <p className="text-center text-sm text-red-500 p-3 bg-red-700/10 rounded-md">{error}</p>}
+          {error && (
+            <p className="text-center text-sm text-red-500 p-3 bg-red-700/10 rounded-md">
+              {error}
+            </p>
+          )}
 
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={
+              isLoading ||
+              (blockTimeRemaining !== null && blockTimeRemaining > 0)
+            }
             className="h-11 w-full rounded-full bg-[#86cbea] text-lg font-semibold text-gray-900 shadow-[0_10px_22px_-14px_rgba(57,120,150,0.65)] transition hover:bg-[#75c1e5]"
           >
-            {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+            {blockTimeRemaining !== null && blockTimeRemaining > 0
+              ? "Cuenta bloqueada"
+              : isLoading
+                ? "Iniciando sesión..."
+                : "Iniciar Sesión"}
           </Button>
 
           <div className="text-center text-sm text-gray-700">
