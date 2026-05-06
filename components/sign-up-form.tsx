@@ -196,7 +196,7 @@ export function SignUpForm({
             </div>
           </form>
           <div className="mt-4 text-center text-sm">
-            ¿Ya tienes una cuenta? <Link href="/auth/login" className="underline underline-offset-4">Inicia sesión</Link>
+            ¿Ya tienes una cuenta? <Link href="/auth/login" className="font-semibold text-cyan-500 underline underline-offset-4 hover:text-cyan-600">Inicia sesión</Link>
           </div>
         </CardContent>
       </Card>
