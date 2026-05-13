@@ -16,10 +16,14 @@ export async function POST(request: Request) {
   try {
     const { medications } = (await request.json()) as DrugInteractionRequest;
 
-    if (!medications || !Array.isArray(medications) || medications.length === 0) {
+    if (
+      !medications ||
+      !Array.isArray(medications) ||
+      medications.length === 0
+    ) {
       return NextResponse.json(
         { error: "Medicamentos no válidos", interactions: [] },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,7 +31,7 @@ export async function POST(request: Request) {
     if (!adminClient) {
       return NextResponse.json(
         { error: "Falta la configuración del servidor." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
       console.error("Error consultando drug_interactions:", error);
       return NextResponse.json(
         { error: "No se pudo consultar interacciones." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -63,10 +67,10 @@ export async function POST(request: Request) {
 
       // Verificar si ambos medicamentos están en la lista de medicamentos ingresados
       const hasA = normalizedMeds.some(
-        (med) => med.includes(medA) || medA.includes(med)
+        (med) => med.includes(medA) || medA.includes(med),
       );
       const hasB = normalizedMeds.some(
-        (med) => med.includes(medB) || medB.includes(med)
+        (med) => med.includes(medB) || medB.includes(med),
       );
 
       if (hasA && hasB && normalizedMeds.length >= 2) {
@@ -79,7 +83,7 @@ export async function POST(request: Request) {
     console.error("Error en /api/drug-interactions/check:", error);
     return NextResponse.json(
       { error: "Error interno del servidor." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

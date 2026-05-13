@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     if (!authCheck.ok) {
       return NextResponse.json(
         { error: authCheck.error },
-        { status: authCheck.status }
+        { status: authCheck.status },
       );
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (!patientId || !medications || medications.length === 0) {
       return NextResponse.json(
         { error: "Datos de prescripción inválidos." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (!adminClient) {
       return NextResponse.json(
         { error: "Falta la configuración del servidor." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     if (relationError || !relation) {
       return NextResponse.json(
         { error: "No tienes permiso para este paciente." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         console.error("Error guardando prescripción:", result.error);
         return NextResponse.json(
           { error: "Error al guardar la prescripción." },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     console.error("Error en POST /api/prescriptions/save:", error);
     return NextResponse.json(
       { error: "Error interno del servidor." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -30,7 +30,7 @@ export function DoctorPatientsList({ patients }: DoctorPatientsListProps) {
     return patients.filter((patient) =>
       (patient.full_name || "")
         .toLowerCase()
-        .includes(searchQuery.toLowerCase().trim())
+        .includes(searchQuery.toLowerCase().trim()),
     );
   }, [patients, searchQuery]);
 
