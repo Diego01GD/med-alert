@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Calculator, Save, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { AlertCircle, Calculator, Save, Plus, Trash2, AlertTriangle, CheckCircle } from "lucide-react";
 
 interface Medication {
   id: string;
@@ -16,24 +17,45 @@ interface Medication {
   riskWarning: string | null;
 }
 
-const RISKY_COMBINATIONS = [
-  { pair: ["aspirina", "warfarina"], message: "Riesgo extremo de hemorragia: La Aspirina potencia el efecto anticoagulante de la Warfarina." },
-  { pair: ["ibuprofeno", "aspirina"], message: "Riesgo de interaccion: El Ibuprofeno puede reducir el efecto cardioprotector de la Aspirina." },
-  { pair: ["alcohol", "paracetamol"], message: "Riesgo de toxicidad hepatica severa." },
-  { pair: ["sildenafil", "nitroglicerina"], message: "Peligro: Caida fatal de la presion arterial." }
-];
+interface DrugInteraction {
+  med_a_name: string;
+  med_b_name: string;
+  severity: "Alta" | "Media" | "Baja";
+  description: string;
+}
 
-export function PrescriptionForm() {
+interface InteractionWarning {
+  severity: "Alta" | "Media" | "Baja";
+  message: string;
+  description: string;
+}
+
+interface PrescriptionFormProps {
+  patientId: string | null;
+  patientInitialAge: number | null;
+  patientInitialWeight: number | null;
+}
+
+export function PrescriptionForm({
+  patientId,
+  patientInitialAge,
+  patientInitialWeight,
+}: PrescriptionFormProps) {
+  const router = useRouter();
   const [patientData, setPatientData] = useState({
-    patientWeight: "",
-    patientAge: "",
+    patientWeight: patientInitialWeight?.toString() ?? "",
+    patientAge: patientInitialAge?.toString() ?? "",
   });
 
   const [medications, setMedications] = useState<Medication[]>([
     { id: "1", medicationName: "", dosage: "", frequency: "", calculatedDose: null, riskWarning: null }
   ]);
 
-  const [interactionWarnings, setInteractionWarnings] = useState<string[]>([]);
+  const [interactionWarnings, setInteractionWarnings] = useState<InteractionWarning[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const topRef = useRef<HTMLDivElement>(null);
 
   const addMedication = () => {
@@ -65,6 +87,52 @@ export function PrescriptionForm() {
     }));
   };
 
+  // Función para consultar interacciones desde la BD
+  const checkDrugInteractions = async (medicationNames: string[]) => {
+    const activeMeds = medicationNames
+      .filter(name => name.trim() !== "");
+
+    if (activeMeds.length < 2) {
+      setInteractionWarnings([]);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/drug-interactions/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medications: activeMeds }),
+      });
+
+      if (!response.ok) {
+        console.error("Error consultando interacciones");
+        setInteractionWarnings([]);
+        return;
+      }
+
+      const data = (await response.json()) as { interactions: DrugInteraction[] };
+      const interactions = data.interactions ?? [];
+
+      const warnings: InteractionWarning[] = interactions.map(interaction => ({
+        severity: interaction.severity,
+        message: `${interaction.med_a_name} + ${interaction.med_b_name} (${interaction.severity})`,
+        description: interaction.description,
+      }));
+
+      setInteractionWarnings(warnings);
+
+      if (warnings.length > 0) {
+        topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } catch (error) {
+      console.error("Error al consultar interacciones:", error);
+      setInteractionWarnings([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const updatedMeds = medications.map(med => {
       if (patientData.patientWeight && patientData.patientAge && med.medicationName) {
@@ -93,24 +161,11 @@ export function PrescriptionForm() {
       setMedications(updatedMeds);
     }
 
-    const activeMeds = medications
-      .map(m => m.medicationName.toLowerCase().trim())
-      .filter(name => name !== "");
+    // Consultar interacciones desde la BD
+    const medicationNames = medications.map(m => m.medicationName);
+    checkDrugInteractions(medicationNames);
 
-    const warnings: string[] = [];
-    RISKY_COMBINATIONS.forEach(combo => {
-      const hasCombo = combo.pair.every(drug => activeMeds.some(m => m.includes(drug)));
-      if (hasCombo) {
-        warnings.push(combo.message);
-      }
-    });
-
-    if (warnings.length > interactionWarnings.length) {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    setInteractionWarnings(warnings);
-
-  }, [patientData, medications.map(m => m.medicationName).join(",")]);
+  }, [patientData, medications]);
 
   const handlePatientChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -118,6 +173,74 @@ export function PrescriptionForm() {
     if (numValue < 0) return;
     if (name === "patientAge" && numValue > 110) return;
     setPatientData({ ...patientData, [name]: value });
+  };
+
+  const handleSavePrescription = async () => {
+    if (!patientId) {
+      setErrorMessage("Por favor selecciona un paciente primero.");
+      return;
+    }
+
+    // Validar que haya al menos un medicamento
+    const validMeds = medications.filter(m => m.medicationName.trim() !== "");
+    if (validMeds.length === 0) {
+      setErrorMessage("Agrega al menos un medicamento a la receta.");
+      return;
+    }
+
+    // Si hay cualquier interacción detectada, bloquear completamente
+    if (interactionWarnings.length > 0) {
+      setErrorMessage("No se puede guardar mientras haya interacciones detectadas. Por favor remueve los medicamentos conflictivos.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      // Convertir frecuencia de texto a horas (ej: "Cada 8 horas" → 8)
+      const extractHours = (frequencyText: string): number => {
+        const match = frequencyText.match(/(\d+)/);
+        return match ? parseInt(match[1]) : 8; // Default 8 si no encuentra número
+      };
+
+      const response = await fetch("/api/prescriptions/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId,
+          medications: validMeds.map(m => ({
+            medicationName: m.medicationName,
+            calculatedDose: m.calculatedDose || "0 mg", // Ej: "35.00 mg"
+            frequencyHours: extractHours(m.frequency), // Extrae horas del texto
+          })),
+          patientAge: patientData.patientAge ? parseInt(patientData.patientAge) : undefined,
+          patientWeight: patientData.patientWeight ? parseFloat(patientData.patientWeight) : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = (await response.json()) as { error: string };
+        setErrorMessage(error.error || "Error al guardar la receta.");
+        return;
+      }
+
+      setSuccessMessage("¡Receta guardada exitosamente y perfil actualizado!");
+      
+      // Limpiar el formulario después de 2 segundos
+      setTimeout(() => {
+        setMedications([
+          { id: "1", medicationName: "", dosage: "", frequency: "", calculatedDose: null, riskWarning: null }
+        ]);
+        setSuccessMessage("");
+      }, 2000);
+    } catch (error) {
+      console.error("Error al guardar la receta:", error);
+      setErrorMessage("Error interno al guardar la receta.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -128,17 +251,43 @@ export function PrescriptionForm() {
         </CardHeader>
         
         <CardContent className="space-y-8">
+          {/* Mensajes de éxito */}
+          {successMessage && (
+            <div className="p-4 bg-green-600 text-white rounded-xl flex items-center gap-4 border-2 border-green-800 animate-pulse">
+              <CheckCircle className="h-8 w-8 shrink-0" />
+              <p className="text-sm font-bold">{successMessage}</p>
+            </div>
+          )}
+
+          {/* Mensajes de error */}
+          {errorMessage && (
+            <div className="p-4 bg-orange-600 text-white rounded-xl flex items-center gap-4 border-2 border-orange-800">
+              <AlertTriangle className="h-8 w-8 shrink-0" />
+              <p className="text-sm font-bold">{errorMessage}</p>
+            </div>
+          )}
+
+          {/* Alertas de interacciones por severidad */}
           {interactionWarnings.length > 0 && (
             <div className="space-y-3">
-              {interactionWarnings.map((warning, idx) => (
-                <div key={idx} className="p-4 bg-red-600 text-white rounded-xl flex items-center gap-4 border-2 border-red-900 animate-pulse">
-                  <AlertTriangle className="h-8 w-8 shrink-0" />
-                  <div>
-                    <p className="font-black uppercase text-xs tracking-widest">¡ALERTA DE SEGURIDAD CRITICA!</p>
-                    <p className="text-sm font-bold">{warning}</p>
+              {interactionWarnings.map((warning, idx) => {
+                const bgColor = warning.severity === "Alta" ? "bg-red-600 border-red-900" : 
+                               warning.severity === "Media" ? "bg-yellow-600 border-yellow-900" : 
+                               "bg-blue-600 border-blue-900";
+                
+                return (
+                  <div key={idx} className={`p-4 ${bgColor} text-white rounded-xl flex items-center gap-4 border-2 animate-pulse`}>
+                    <AlertTriangle className="h-8 w-8 shrink-0" />
+                    <div>
+                      <p className="font-black uppercase text-xs tracking-widest">
+                        ¡ALERTA DE SEVERIDAD {warning.severity}!
+                      </p>
+                      <p className="text-sm font-bold">{warning.message}</p>
+                      <p className="text-xs opacity-90 mt-1">{warning.description}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -238,19 +387,25 @@ export function PrescriptionForm() {
         </CardContent>
 
         <CardFooter className="flex justify-end gap-3 pt-8">
-          <Button variant="outline" className="rounded-xl border-slate-900 bg-black text-white hover:bg-slate-900 px-10 font-black tracking-widest uppercase text-xs">
+          <Button 
+            variant="outline" 
+            className="rounded-xl border-slate-900 bg-black text-white hover:bg-slate-900 px-10 font-black tracking-widest uppercase text-xs"
+            disabled={isSaving}
+            onClick={() => router.push("/protected/doctor")}
+          >
             Cancelar
           </Button>
           <Button 
-            disabled={interactionWarnings.length > 0}
+            disabled={isSaving || isLoading || !patientId || medications.filter(m => m.medicationName.trim() !== "").length === 0 || interactionWarnings.length > 0}
+            onClick={handleSavePrescription}
             className={`rounded-xl border-2 border-slate-900 gap-2 px-10 font-black tracking-widest uppercase text-xs shadow-xl transition-all ${
-              interactionWarnings.length > 0 
+              isSaving || isLoading || !patientId || medications.filter(m => m.medicationName.trim() !== "").length === 0 || interactionWarnings.length > 0
                 ? "bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed" 
                 : "bg-white text-black hover:bg-slate-200"
             }`}
           >
             <Save className="h-4 w-4" />
-            Guardar Receta
+            {isSaving ? "Guardando..." : "Guardar Receta"}
           </Button>
         </CardFooter>
       </Card>
