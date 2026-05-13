@@ -35,13 +35,13 @@ export default function LandingPage() {
         <div className="hidden md:flex gap-8 text-sm font-medium">
           <Link
             href="#features"
-            className="hover:text-sky-700 transition-colors"
+            className="hover:text-sky-700 transition-colors text-black"
           >
             Funcionalidades
           </Link>
           <Link
             href="#security"
-            className="hover:text-sky-700 transition-colors"
+            className="hover:text-sky-700 transition-colors text-black"
           >
             Seguridad
           </Link>
@@ -93,7 +93,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               variant="outline"
-              className="border-slate-300 rounded-2xl px-8 py-7 text-lg bg-white/50 backdrop-blur-sm"
+              className="border-slate-300 rounded-2xl px-8 py-7 text-lg bg-white/50 backdrop-blur-sm text-black "
             >
               Saber más
             </Button>
@@ -132,7 +132,7 @@ export default function LandingPage() {
         {/* Security Info */}
         <section id="security" className="px-6 py-20 text-center">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold mb-6">
+            <h2 className="text-3xl font-bold mb-6 text-black">
               Privacidad de grado médico
             </h2>
             <p className="text-slate-600">
@@ -164,7 +164,7 @@ function FeatureCard({
   return (
     <div className="bg-white p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-100 flex flex-col items-center text-center">
       <div className="mb-4 p-3 bg-sky-50 rounded-2xl">{icon}</div>
-      <h3 className="font-bold text-lg mb-2">{title}</h3>
+      <h3 className="font-bold text-lg mb-2 text-black">{title}</h3>
       <p className="text-slate-500 text-sm">{description}</p>
     </div>
   );

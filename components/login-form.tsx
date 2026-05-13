@@ -10,6 +10,8 @@ import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getDashboardPathForRole } from "@/lib/auth/roles";
+import { hasEnvVars } from "@/lib/utils";
 
 const ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -157,19 +159,59 @@ export function LoginForm({
     setIsLoading(true);
     setError(null);
 
+    if (!hasEnvVars) {
+      setError(
+        "Faltan las variables de entorno de Supabase. Revisa NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+      );
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: signInData, error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
       if (error) throw error;
+
+      const userId = signInData.user?.id;
+      if (!userId) {
+        throw new Error("No se pudo identificar el perfil del usuario.");
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const dashboardPath = getDashboardPathForRole(profile?.role);
+      if (!dashboardPath) {
+        throw new Error("No se encontró una ruta disponible para tu rol.");
+      }
 
       if (normalizedEmail) {
         clearSecurityState(normalizedEmail);
       }
-      router.push("/protected");
+      router.replace(dashboardPath);
+      router.refresh();
     } catch (error: unknown) {
       if (error instanceof Error) {
+        if (
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("fetch failed")
+        ) {
+          setError(
+            "No se pudo conectar con Supabase. Verifica la URL y la clave pública del proyecto.",
+          );
+          return;
+        }
+
         if (error.message.includes("Invalid login credentials")) {
           setError("Correo o contraseña incorrectos");
           if (normalizedEmail) {
