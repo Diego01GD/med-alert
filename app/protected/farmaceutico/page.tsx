@@ -41,21 +41,25 @@ export default async function PharmacistDashboardPage() {
     ? await adminClient.from("profiles").select("id, full_name, age, weight, phone_number").in("id", patientIds)
     : { data: [] };
 
-  const { data: prescriptionsData } = patientIds.length > 0
-    ? await adminClient.from("prescriptions").select("id, patient_id, medication_name, dosage_info, frequency_hours, stock_actual, updated_at, is_active").in("patient_id", patientIds)
-    : { data: [] };
+  const { data: prescriptionsData, error: prescriptionsError } = patientIds.length > 0
+    ? await adminClient.from("prescriptions").select("id, patient_id, medication_name, dosage_info, frequency_hours, stock_actual, created_at, is_active").in("patient_id", patientIds)
+    : { data: [], error: null };
+
+  if (prescriptionsError) {
+    console.error("Error fetching prescriptions:", prescriptionsError);
+  }
 
   const dbPatients: Patient[] = (patientsData || []).map((p: any) => {
     const pMeds = (prescriptionsData || []).filter((med: any) => med.patient_id === p.id && med.is_active);
     const medications: Medication[] = pMeds.map((m: any) => ({
       name: m.medication_name,
-      dose: `${m.dosage_info || "1"} cada ${m.frequency_hours || 12} horas`,
+      dose: `${m.dosage_info?.dose || "1 tableta"} cada ${m.frequency_hours || 12} horas`,
       stock: m.stock_actual || 0,
       status: (m.stock_actual || 0) < 20 ? "Bajo" : "Normal",
-      lastUpdate: m.updated_at ? new Date(m.updated_at).toLocaleDateString() : "N/A",
+      lastUpdate: m.created_at ? new Date(m.created_at).toLocaleDateString() : "N/A",
     }));
 
-    const stockStatus = medications.some(m => m.status === "Bajo") ? "Stock bajo" : "Stock OK";
+    const stockStatus = medications.length > 0 && medications.some(m => m.status === "Bajo") ? "Stock bajo" : "Stock OK";
 
     return {
       id: p.id,
