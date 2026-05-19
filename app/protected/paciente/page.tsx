@@ -1,4 +1,5 @@
 ﻿import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { getCurrentUserProfile } from "@/lib/supabase/profiles";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,7 +35,7 @@ type IntakeLogRecord = {
   created_at: string | null;
 };
 
-export default async function PatientDashboardPage() {
+async function PatientDashboardContent() {
   const profile = await getCurrentUserProfile();
 
   if (!profile || profile.role !== "paciente") {
@@ -80,7 +81,24 @@ export default async function PatientDashboardPage() {
       throw intakeLogsError;
     }
 
-    intakeLogs = (intakeLogsData ?? []) as IntakeLogRecord[];
+    // Mapear los valores de la enum en la DB a los estados en español que usa la UI.
+    function mapDbStatusToUi(status: string) {
+      switch (status) {
+        case "taken":
+          return "cumplido";
+        case "late":
+          return "atrasado";
+        case "missed":
+          return "omitido";
+        default:
+          return status;
+      }
+    }
+
+    intakeLogs = (intakeLogsData ?? []).map((row: any) => ({
+      ...row,
+      status: mapDbStatusToUi(row.status),
+    })) as IntakeLogRecord[];
   }
 
   return (
@@ -111,5 +129,21 @@ export default async function PatientDashboardPage() {
         />
       </div>
     </div>
+  );
+}
+
+function PatientDashboardFallback() {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+      Cargando...
+    </div>
+  );
+}
+
+export default function PatientDashboardPage() {
+  return (
+    <Suspense fallback={<PatientDashboardFallback />}>
+      <PatientDashboardContent />
+    </Suspense>
   );
 }

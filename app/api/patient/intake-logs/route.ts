@@ -85,6 +85,15 @@ export async function POST(request: Request) {
       );
     }
 
+    function mapStatusToDb(status: CreateIntakeLogPayload["status"]) {
+      switch (status) {
+        case "omitido":
+          return "no_cumplido";
+        default:
+          return status;
+      }
+    }
+
     const { data: createdRecord, error: insertError } = await adminClient
       .from("intake_logs")
       .insert({
@@ -92,7 +101,7 @@ export async function POST(request: Request) {
         prescription_id: body.prescriptionId,
         scheduled_time: body.scheduledTime,
         actual_time: body.actualTime,
-        status: body.status,
+        status: mapStatusToDb(body.status),
         omission_reason: body.omissionReason ?? null,
         side_effects: body.sideEffects ?? null,
         observations: body.observations ?? null,
@@ -110,7 +119,22 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, record: createdRecord });
+    // Convertir el status de la DB a la representación en español para la UI.
+    function mapDbStatusToUi(status: string) {
+      switch (status) {
+        case "no_cumplido":
+          return "omitido";
+        default:
+          return status;
+      }
+    }
+
+    const uiRecord = {
+      ...createdRecord,
+      status: mapDbStatusToUi((createdRecord as any).status),
+    };
+
+    return NextResponse.json({ success: true, record: uiRecord });
   } catch (error) {
     console.error("Error en POST /api/patient/intake-logs:", error);
     return NextResponse.json(
