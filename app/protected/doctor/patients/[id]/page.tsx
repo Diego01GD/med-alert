@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUserProfile } from "@/lib/supabase/profiles";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PatientDetailClient } from "@/components/doctor/patient-detail-client";
+import { PatientDetailWrapper } from "@/components/doctor/patient-detail-wrapper";
 import MiniLogo from "@/components/mini-logo";
 import { LogoutButton } from "@/components/logout-button";
 
@@ -82,7 +82,7 @@ export default async function DoctorPatientDetailPage({ params }: RouteParams) {
       </header>
 
       <main className="mx-auto w-full max-w-[98%] rounded-[40px] bg-slate-50/50 p-6 lg:p-10">
-        <PatientDetailClient
+        <PatientDetailWrapper
           patient={patient}
           prescriptions={(prescriptions ?? []) as never[]}
           history={(changesData ?? []) as never[]}
