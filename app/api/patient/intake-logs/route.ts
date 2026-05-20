@@ -119,6 +119,64 @@ export async function POST(request: Request) {
       );
     }
 
+    let updatedPrescription: {
+      id: string;
+      medication_name: string;
+      stock_actual: number | null;
+      stock_inicial: number | null;
+    } | null = null;
+
+    if (body.status !== "omitido") {
+      const { data: currentPrescription, error: currentPrescriptionError } =
+        await adminClient
+          .from("prescriptions")
+          .select("id, medication_name, stock_actual, stock_inicial")
+          .eq("id", body.prescriptionId)
+          .eq("patient_id", authCheck.patientId)
+          .maybeSingle();
+
+      if (currentPrescriptionError || !currentPrescription) {
+        console.error(
+          "Error consultando la prescripcion para descontar stock:",
+          currentPrescriptionError,
+        );
+      } else {
+        const currentStock = currentPrescription.stock_actual ?? 0;
+        const nextStock = Math.max(0, currentStock - 1);
+        const { data: savedPrescription, error: stockUpdateError } =
+          await adminClient
+            .from("prescriptions")
+            .update({ stock_actual: nextStock })
+            .eq("id", currentPrescription.id)
+            .select("id, medication_name, stock_actual, stock_inicial")
+            .maybeSingle();
+
+        if (stockUpdateError) {
+          console.error(
+            "Error actualizando stock tras registro de toma:",
+            stockUpdateError,
+          );
+        } else {
+          updatedPrescription =
+            (savedPrescription as typeof updatedPrescription) ?? null;
+
+          const stockInitial = currentPrescription.stock_inicial ?? 0;
+          const stockRatio =
+            stockInitial > 0 ? (nextStock / stockInitial) * 100 : null;
+
+          console.log(
+            `[SIMULATED MESSAGE] Stock actualizado para ${currentPrescription.medication_name}: ${currentStock} -> ${nextStock}`,
+          );
+
+          if (stockRatio !== null && stockRatio <= 20) {
+            console.log(
+              `[SIMULATED MESSAGE] Alerta de stock bajo para ${currentPrescription.medication_name}: quedan ${nextStock} unidades de ${stockInitial} (${stockRatio.toFixed(0)}%).`,
+            );
+          }
+        }
+      }
+    }
+
     // Convertir el status de la DB a la representación en español para la UI.
     function mapDbStatusToUi(status: string) {
       switch (status) {
@@ -134,7 +192,11 @@ export async function POST(request: Request) {
       status: mapDbStatusToUi((createdRecord as any).status),
     };
 
-    return NextResponse.json({ success: true, record: uiRecord });
+    return NextResponse.json({
+      success: true,
+      record: uiRecord,
+      updatedPrescription,
+    });
   } catch (error) {
     console.error("Error en POST /api/patient/intake-logs:", error);
     return NextResponse.json(

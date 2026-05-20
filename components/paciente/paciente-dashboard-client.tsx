@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Clock3, Loader2, Pill, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ type PrescriptionRecord = {
   frequency_hours: number | null;
   start_time: string | null;
   stock_actual: number | null;
+  stock_inicial: number | null;
   is_active: boolean | null;
   created_at: string | null;
 };
@@ -233,6 +234,23 @@ function buildNoticeItems(
   const items: NoticeItem[] = [];
 
   views.forEach((view) => {
+    const stockInitial = view.prescription.stock_inicial ?? 0;
+    const stockActual = view.prescription.stock_actual ?? 0;
+
+    if (stockInitial > 0) {
+      const stockPercent = (stockActual / stockInitial) * 100;
+
+      if (stockPercent <= 20) {
+        items.push({
+          id: `${view.prescription.id}-stock-low`,
+          title: "Stock bajo",
+          description: `${view.prescription.medication_name} tiene ${stockActual} de ${stockInitial} unidades disponibles (${stockPercent.toFixed(0)}%). Por favor acude a farmacia para recibir más unidades del medicamento. O en su caso para avisar la compra de más unidades para rellenar su inventario.`,
+          tone: stockPercent <= 10 ? "critical" : "warning",
+          dueAt: new Date(now).toISOString(),
+        });
+      }
+    }
+
     if (!view.nextScheduledTime) {
       return;
     }
@@ -287,6 +305,8 @@ export function PatientDashboardClient({
   intakeLogs,
 }: PatientDashboardClientProps) {
   const [records, setRecords] = useState(intakeLogs);
+  const [currentPrescriptions, setCurrentPrescriptions] =
+    useState(prescriptions);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
@@ -302,6 +322,11 @@ export function PatientDashboardClient({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const loggedNoticeIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    setCurrentPrescriptions(prescriptions);
+  }, [prescriptions]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -312,8 +337,8 @@ export function PatientDashboardClient({
   }, []);
 
   const activePrescriptions = useMemo(
-    () => prescriptions.filter((item) => item.is_active !== false),
-    [prescriptions],
+    () => currentPrescriptions.filter((item) => item.is_active !== false),
+    [currentPrescriptions],
   );
 
   const logsByPrescription = useMemo(
@@ -377,6 +402,17 @@ export function PatientDashboardClient({
     [prescriptionViews, now],
   );
 
+  useEffect(() => {
+    noticeItems.forEach((notice) => {
+      if (loggedNoticeIds.current.has(notice.id)) {
+        return;
+      }
+
+      loggedNoticeIds.current.add(notice.id);
+      console.log(`[SIMULATED MESSAGE] ${notice.title}: ${notice.description}`);
+    });
+  }, [noticeItems]);
+
   // const completedCount = prescriptionViews.filter(
   //   (item) => item.hasFirstTake,
   // ).length;
@@ -411,6 +447,7 @@ export function PatientDashboardClient({
       const data = (await response.json()) as {
         error?: string;
         record?: IntakeLogRecord;
+        updatedPrescription?: PrescriptionRecord | null;
       };
 
       if (!response.ok || !data.record) {
@@ -419,6 +456,25 @@ export function PatientDashboardClient({
       }
 
       setRecords((current) => [...current, data.record as IntakeLogRecord]);
+
+      if (data.updatedPrescription) {
+        setCurrentPrescriptions((current) =>
+          current.map((prescription) =>
+            prescription.id === data.updatedPrescription?.id
+              ? {
+                  ...prescription,
+                  stock_actual:
+                    data.updatedPrescription?.stock_actual ??
+                    prescription.stock_actual,
+                  stock_inicial:
+                    data.updatedPrescription?.stock_inicial ??
+                    prescription.stock_inicial,
+                }
+              : prescription,
+          ),
+        );
+      }
+
       setPendingAction(null);
       setFormState({
         omissionReason: "",

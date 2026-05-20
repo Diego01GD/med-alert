@@ -100,6 +100,7 @@ export async function POST(request: Request) {
           frequency_hours: med.frequencyHours,
           start_time: new Date().toISOString(),
           stock_actual: 0,
+          stock_inicial: 0,
           is_active: true,
         });
       });

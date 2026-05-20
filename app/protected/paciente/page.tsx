@@ -19,6 +19,7 @@ type PrescriptionRecord = {
   frequency_hours: number | null;
   start_time: string | null;
   stock_actual: number | null;
+  stock_inicial: number | null;
   is_active: boolean | null;
   created_at: string | null;
 };
@@ -54,7 +55,7 @@ async function PatientDashboardContent() {
     await adminClient
       .from("prescriptions")
       .select(
-        "id, medication_name, dosage_info, frequency_hours, start_time, stock_actual, is_active, created_at",
+        "id, medication_name, dosage_info, frequency_hours, start_time, stock_actual, stock_inicial, is_active, created_at",
       )
       .eq("patient_id", profile.id)
       .order("created_at", { ascending: false });
