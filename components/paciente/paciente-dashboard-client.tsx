@@ -409,9 +409,18 @@ export function PatientDashboardClient({
       }
 
       loggedNoticeIds.current.add(notice.id);
-      console.log(`[SIMULATED MESSAGE] ${notice.title}: ${notice.description}`);
+      if (notice.title === "Stock bajo") {
+        console.log(
+          `[SIMULATED SMS] Enviado a ${patientName ?? "paciente"}: ${notice.description}`,
+        );
+        return;
+      }
+
+      console.log(
+        `[SIMULATED SMS] Enviado a ${patientName ?? "paciente"} - ${notice.title}: ${notice.description}`,
+      );
     });
-  }, [noticeItems]);
+  }, [noticeItems, patientName]);
 
   // const completedCount = prescriptionViews.filter(
   //   (item) => item.hasFirstTake,
