@@ -6,9 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 const adminRoles = new Set(["admin", "administrador"]);
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export async function DELETE(_request: Request, context: RouteContext) {

@@ -77,7 +77,7 @@ export function DoseBreakdownChart({ data }: DoseBreakdownChartProps) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => value.toString()}
+                formatter={(value: any) => String(value)}
                 contentStyle={{
                   backgroundColor: "#f8fafc",
                   border: "1px solid #e2e8f0",

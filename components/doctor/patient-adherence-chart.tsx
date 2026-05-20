@@ -51,7 +51,7 @@ export function PatientAdherenceChart({
               stroke="#64748b"
             />
             <Tooltip
-              formatter={(value: number) => `${value}%`}
+              formatter={(value: any) => `${value}%`}
               contentStyle={{
                 backgroundColor: "#f8fafc",
                 border: "1px solid #e2e8f0",
