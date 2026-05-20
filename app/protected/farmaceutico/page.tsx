@@ -77,13 +77,23 @@ export default async function PharmacistDashboardPage() {
   (prescriptionsData || [])
     .slice()
     .sort((left: any, right: any) => {
-      const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
-      const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
+      const leftTime = left.created_at
+        ? new Date(left.created_at).getTime()
+        : 0;
+      const rightTime = right.created_at
+        ? new Date(right.created_at).getTime()
+        : 0;
       return rightTime - leftTime;
     })
     .forEach((prescription: any) => {
-      if (!latestDoctorByPatient.has(prescription.patient_id) && prescription.doctor_id) {
-        latestDoctorByPatient.set(prescription.patient_id, prescription.doctor_id);
+      if (
+        !latestDoctorByPatient.has(prescription.patient_id) &&
+        prescription.doctor_id
+      ) {
+        latestDoctorByPatient.set(
+          prescription.patient_id,
+          prescription.doctor_id,
+        );
         doctorIds.add(prescription.doctor_id);
       }
     });
@@ -97,7 +107,10 @@ export default async function PharmacistDashboardPage() {
       : { data: [] };
 
   const doctorNameById = new Map(
-    (doctorsData || []).map((doctor: any) => [doctor.id, doctor.full_name || "Médico"]),
+    (doctorsData || []).map((doctor: any) => [
+      doctor.id,
+      doctor.full_name || "Médico",
+    ]),
   );
 
   const dbPatients: Patient[] = (patientsData || []).map((p: any) => {
@@ -134,7 +147,8 @@ export default async function PharmacistDashboardPage() {
       weight: p.weight || 0,
       phone: p.phone_number || "No registrado",
       patientId: `PA-${p.id.substring(0, 4)}`,
-      doctor: doctorNameById.get(latestDoctorByPatient.get(p.id) || "") || "N/A",
+      doctor:
+        doctorNameById.get(latestDoctorByPatient.get(p.id) || "") || "N/A",
       status: stockStatus,
       medications,
     };

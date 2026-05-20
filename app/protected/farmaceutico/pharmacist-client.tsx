@@ -63,8 +63,12 @@ export function PharmacistClient({
   const [stockMessage, setStockMessage] = useState<string | null>(null);
   const [suggestionText, setSuggestionText] = useState("");
   const [observationText, setObservationText] = useState("");
-  const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
-  const [observationMessage, setObservationMessage] = useState<string | null>(null);
+  const [suggestionMessage, setSuggestionMessage] = useState<string | null>(
+    null,
+  );
+  const [observationMessage, setObservationMessage] = useState<string | null>(
+    null,
+  );
   const [isSendingSuggestion, setIsSendingSuggestion] = useState(false);
   const [isSendingObservation, setIsSendingObservation] = useState(false);
 
@@ -251,7 +255,9 @@ export function PharmacistClient({
 
   const sendObservation = async () => {
     if (!activePatient) {
-      setObservationMessage("Selecciona un paciente para enviar la observación.");
+      setObservationMessage(
+        "Selecciona un paciente para enviar la observación.",
+      );
       return;
     }
 
@@ -534,7 +540,9 @@ export function PharmacistClient({
                         type="text"
                         placeholder="Escribe el nombre del medicamento genérico..."
                         value={suggestionText}
-                        onChange={(event) => setSuggestionText(event.target.value)}
+                        onChange={(event) =>
+                          setSuggestionText(event.target.value)
+                        }
                         className="w-full border border-slate-400 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200 mb-4"
                       />
                     </div>
@@ -545,7 +553,9 @@ export function PharmacistClient({
                         disabled={isSendingSuggestion}
                         className="bg-[#85C8E7] hover:bg-[#74B8D7] text-slate-800 font-bold py-2.5 px-8 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {isSendingSuggestion ? "Enviando..." : "Enviar sugerencia"}
+                        {isSendingSuggestion
+                          ? "Enviando..."
+                          : "Enviar sugerencia"}
                       </button>
                       <span className="text-xs text-slate-500">
                         El paciente recibirá una notificación SMS con tu
@@ -567,7 +577,9 @@ export function PharmacistClient({
                       <textarea
                         placeholder="Escribe el nombre del medicamento genérico..."
                         value={observationText}
-                        onChange={(event) => setObservationText(event.target.value)}
+                        onChange={(event) =>
+                          setObservationText(event.target.value)
+                        }
                         className="w-full border border-slate-400 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 min-h-[80px] mb-4 resize-none"
                       />
                     </div>
@@ -578,7 +590,9 @@ export function PharmacistClient({
                         disabled={isSendingObservation}
                         className="bg-[#EF4444] hover:bg-red-600 text-white font-bold py-2.5 px-8 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {isSendingObservation ? "Enviando..." : "Enviar Observación"}
+                        {isSendingObservation
+                          ? "Enviando..."
+                          : "Enviar Observación"}
                       </button>
                       <span className="text-xs text-slate-500">
                         El médico responsable recibirá una notificación SMS
