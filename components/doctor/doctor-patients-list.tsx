@@ -63,7 +63,7 @@ export function DoctorPatientsList({ patients }: DoctorPatientsListProps) {
           filteredPatients.map((patient) => (
             <Link
               key={patient.id}
-              href={`/protected/doctor/prescriptions?patientId=${patient.id}`}
+              href={`/protected/doctor/patients/${patient.id}`}
               className="grid grid-cols-3 items-center border-t border-slate-600/40 p-6 text-slate-900 transition hover:bg-slate-700/10"
             >
               <div className="px-4">

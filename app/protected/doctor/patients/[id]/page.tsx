@@ -52,6 +52,13 @@ export default async function DoctorPatientDetailPage({ params }: RouteParams) {
       .order("created_at", { ascending: false }),
   ]);
 
+  // Attempt to fetch prescription changes, ignore error if table doesn't exist
+  const { data: changesData } = await adminClient
+    .from("prescription_changes")
+    .select("*, doctor:doctor_id(full_name)")
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: false });
+
   if (patientError) throw patientError;
   if (relationError) throw relationError;
   if (prescriptionsError) throw prescriptionsError;
@@ -78,6 +85,7 @@ export default async function DoctorPatientDetailPage({ params }: RouteParams) {
         <PatientDetailClient
           patient={patient}
           prescriptions={(prescriptions ?? []) as never[]}
+          history={(changesData ?? []) as never[]}
         />
       </main>
     </div>
